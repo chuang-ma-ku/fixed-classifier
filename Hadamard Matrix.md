@@ -178,4 +178,42 @@ mat = torch.from_numpy(hadamard(sz))
 
 需要注意的是，哈达玛矩阵的大小必须是2的幂，这就是在计算`sz`时需要取2的幂的原因。
 
+```Python
+if fixed_weights:
+    self.proj = Variable(mat, requires_grad=False)
+else:
+    self.proj = nn.Parameter(mat)
+```
+```Python
+init_scale = 1. / math.sqrt(self.output_size)
 
+if fixed_scale is not None:
+    self.scale = Variable(torch.Tensor(
+        [fixed_scale]), requires_grad=False)
+else:
+    self.scale = nn.Parameter(torch.Tensor([init_scale]))
+```
+
+```Python
+if bias:
+    self.bias = nn.Parameter(torch.Tensor(
+        output_size).uniform_(-init_scale, init_scale))
+else:
+    self.register_parameter('bias', None)
+```
+
+> 这段代码定义了 `HadamardProj` 类的前向传播过程，即输入数据怎样通过这个模块进行处理和变换。以下是详细的解释：
+> 
+> - `if not isinstance(self.scale, nn.Parameter):` 这一行代码检查 `self.scale` 是否是 `nn.Parameter` 类型。如果不是，则将 `self.scale` 转化为与输入数据 `x` 相同的数据类型。
+> 
+> - `x = x / (x.norm(2, -1, keepdim=True) + self.eps)` 这一行代码计算了输入 `x` 的L2范数（即每行的元素的平方和再开平方），然后将输入 `x` 除以其L2范数进行归一化，使得每行的L2范数为1。`self.eps` 是一个非常小的值，用于防止除0错误。
+> 
+> - `w = self.proj.type_as(x)` 这一行代码将哈达玛矩阵 `self.proj` 转化为与输入数据 `x` 相同的数据类型。
+> 
+> - `out = -self.scale * nn.functional.linear(x, w[:self.output_size, :self.input_size])` 这一行代码首先对输入 `x` 进行线性变换（矩阵乘法），其中权重矩阵 `w` 被截取为前 `self.output_size` 行和前 `self.input_size` 列，然后乘以一个负的比例因子 `self.scale`。
+> 
+> - `if self.bias is not None:` 这一行代码检查是否存在偏置参数 `self.bias`。如果存在，则将偏置加到输出 `out` 上。
+> 
+> - `return out` 最后，返回处理后的输出数据 `out`。
+> 
+> 总的来说，这个前向传播过程实现了通过哈达玛矩阵对输入数据进行投影的操作，然后再通过线性变换和加偏置得到最终的输出。这个过程的主要目的是将输入数据变换到一个新的空间，以便于进行后续的计算或处理。
